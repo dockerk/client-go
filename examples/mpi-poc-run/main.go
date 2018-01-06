@@ -23,15 +23,15 @@ import (
 	"path/filepath"
 	"strings"
 	"net"
-	yaml "github.com/davidje13/yaml.v2"
 	"errors"
 
-	//appsv1beta1 "k8s.io/api/apps/v1beta1"
 	apiv1 "k8s.io/client-go/pkg/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/fields"
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
@@ -39,8 +39,7 @@ import (
 	//appsv1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 	extensionsv1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 
-	//"k8s.io/apimachinery/pkg/labels"
-	//"k8s.io/apimachinery/pkg/fields"
+
 	"time"
 )
 
@@ -57,13 +56,12 @@ const (
 	VASP_CONFIGMAP_NAME = "vasp-config"
 	VASP_HOSTFILE_NAME = "hostsfile"
 	VASP_HOSTFILE_VOL_NAME = "hostsfilevol"
-
 )
 
-/*func generateApiListOptRegex(labelMap map[string]string, fieldMap map[string]string, labelsRegex string) (apiv1.ListOptions, error) {
+func generateApiListOptRegex(labelMap map[string]string, fieldMap map[string]string, labelsRegex string) (metav1.ListOptions, error) {
 	labelSelector := labels.Everything()
 	fieldSelector := fields.Everything()
-	var opt apiv1.ListOptions
+	var opt metav1.ListOptions
 	var err error
 
 	if len(labelMap) > 0 {
@@ -81,29 +79,14 @@ const (
 		}
 	}
 
-	opt = apiv1.ListOptions{
-		LabelSelector: labelSelector,
-		FieldSelector: fieldSelector,
+	opt = metav1.ListOptions{
+		LabelSelector: labelSelector.String(),
+		FieldSelector: fieldSelector.String(),
 	}
+
+	fmt.Printf("opt : %#v",opt)
+
 	return opt, nil
-}*/
-
-func MarshalConfigMapData(configValueMap map[string]string)  (string, error)  {
-	var strYaml string
-	var err error = nil
-
-	if len(configValueMap) == 0 {
-		return strYaml,nil
-	}
-
-	strByte, err := yaml.Marshal(configValueMap)
-	if err != nil {
-		fmt.Errorf("Marshal the strMap failed, error=%s.", err.Error())
-		return strYaml, errors.New(fmt.Sprintf("Marshal the strMap failed, error=%s.", err.Error()))
-	}
-
-	strYaml = string(strByte)
-	return strYaml,nil
 }
 
 func getLocalIp()(string,error) {
@@ -198,19 +181,19 @@ func main() {
 	//获取Pod列表，获取Pod 的IP
 	podClient := clientset.Core().Pods(namespace)
 
-	//strRegex := fmt.Sprintf("%s in (%s)",LABEL_APP,VASP_SERVICE_NAME)
-	//fmt.Println("regex: %s",strRegex)
+	var labelMap = make(map[string]string,0)
+	labelMap[LABEL_APP] = VASP_SERVICE_NAME
 
-	/*opt, err := generateApiListOptRegex(nil, nil, strRegex)
+	opt, err := generateApiListOptRegex(labelMap, nil, "")
 	if err != nil {
 		panic(err)
-	}*/
-	opt := metav1.ListOptions{}
+	}
 
 	var ipList []string
 	var allRuning bool = false
-	for j := 0; j<100 ; j++ {
-		time.Sleep(60)
+	var j = 0;
+	for j = 0; j<10 ; j++ {
+		time.Sleep(5 * time.Second)
 
 		fmt.Printf("list pod loop(%d) \n",j)
 
@@ -239,7 +222,12 @@ func main() {
 		}
 	}
 
-	fmt.Printf("list pod succeed,%s\n, len(%d)",strings.Join(ipList,","),len(ipList))
+	if j < 10 {
+		fmt.Printf("list pod succeed,%s\n, len(%d)", strings.Join(ipList, ","), len(ipList))
+	} else {
+		panic(errors.New("list pod failed"))
+	}
+
 
 	//将获取IP转换成对应的configmap
 	configmap := apiv1.ConfigMap{}
@@ -264,7 +252,7 @@ func main() {
 	fmt.Printf("create configmap %s succeed\n",VASP_CONFIGMAP_NAME)
 
 	//创建vasp-master的服务，启动执行任务
-	deployMasterLabels := map[string]string{LABEL_APP: VASP_SERVICE_NAME,}
+	deployMasterLabels := map[string]string{LABEL_APP: VASP_MASTER_SERVICE_NAME,}
 	ipAddr, err := getLocalIp()
 	if err != nil {
 		panic(err)
