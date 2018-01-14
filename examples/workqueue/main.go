@@ -141,6 +141,7 @@ func (c *Controller) runWorker() {
 	}
 }
 
+//使用list-watch机制，可以避免频繁的拉取状态
 func main() {
 	var kubeconfig string
 	var master string
