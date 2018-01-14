@@ -37,6 +37,8 @@ const (
 
 func int32Ptr(i int32) *int32 { return &i }
 
+//参考K8s代码：src\k8s.io
+//kubernetes\pkg\printers\internalversion\describe.go:2399   func (d *NodeDescriber) Describe
 func main() {
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
@@ -55,7 +57,7 @@ func main() {
 		panic(err)
 	}
 
-	namespace := "" //查询所有命名空间下的Pod
+	namespace := apiv1.NamespaceAll //查询所有命名空间下的Pod
 
 	//查找node信息
 	nodeClient := clientset.Core().Nodes()
